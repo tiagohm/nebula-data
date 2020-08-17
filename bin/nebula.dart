@@ -2,9 +2,15 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/args.dart';
+import 'package:image/image.dart';
+import 'package:nebula/src/helper.dart';
 import 'package:nebula/src/nebula.dart';
 import 'package:nebula/src/nebula_decoder.dart';
 import 'package:restio/restio.dart';
+
+const defaultQuality = 70;
+const defaultWidth = 512;
+const defaultHeight = 512;
 
 final catalogRequest = Request.get(
     'https://raw.githubusercontent.com/Stellarium/stellarium/master/nebulae/default/catalog.dat');
@@ -32,13 +38,20 @@ final restio = Restio(onDownloadProgress: (res, length, total, end) {
 
 class ProgressBar {
   var _output = '';
+  String prefix = '';
 
   void update(String text) {
+    for (var i = 0; i < prefix.length; i++) {
+      stdout.writeCharCode(8); // Backspace.
+    }
+
     for (var i = 0; i < _output.length; i++) {
       stdout.writeCharCode(8); // Backspace.
     }
 
     _output = text;
+
+    stdout.write(prefix);
     stdout.write(text);
   }
 
@@ -48,27 +61,47 @@ class ProgressBar {
 }
 
 void main(List<String> args) async {
-  final argParser = ArgParser()
+  final parser = ArgParser()
     ..addOption('input', abbr: 'i')
     ..addOption('names', abbr: 'n')
     ..addOption('output', abbr: 'o')
+    ..addOption('photo-output', defaultsTo: './photos')
+    ..addOption('quality', abbr: 'q', defaultsTo: '$defaultQuality')
+    ..addOption('width', abbr: 'w', defaultsTo: '$defaultWidth')
+    ..addOption('height', abbr: 'h', defaultsTo: '$defaultHeight')
     ..addFlag('extended', abbr: 'x')
     ..addFlag('minify', abbr: 'm')
     ..addFlag('zipped', abbr: 'z')
-    ..addFlag('force', abbr: 'f');
+    ..addFlag('force', abbr: 'f')
+    ..addFlag('photo', abbr: 'p')
+    ..addFlag('webp', negatable: false);
 
-  final argResult = argParser.parse(args);
-  final extended = argResult['extended'] == true;
-  final minify = argResult['minify'] == true;
-  final zipped = argResult['zipped'] == true;
-  final force = argResult['force'] == true;
+  final result = parser.parse(args);
+
+  await handleCatalog(result);
+}
+
+Future<void> handleCatalog(ArgResults result) async {
+  final extended = result['extended'] as bool;
+  final minify = result['minify'] as bool;
+  final zipped = result['zipped'] as bool;
+  final force = result['force'] as bool;
+  final photo = result['photo'] as bool;
+  final input = result['input'] as String;
+  final names = result['names'] as String;
+  final output = result['output'] as String;
+  final photoOutput = result['photo-output'] as String;
+  final quality = int.tryParse(result['quality']) ?? defaultQuality;
+  final width = int.tryParse(result['width']) ?? defaultWidth;
+  final height = int.tryParse(result['height']) ?? defaultHeight;
+  final webp = result['webp'] as bool;
 
   File inputFile;
   File namesFile;
   File outputFile;
 
-  if (argResult['input'] != null) {
-    inputFile = File(argResult['input']);
+  if (input != null) {
+    inputFile = File(input);
   } else if (!force && !extended && defaultCatalogFile.existsSync()) {
     inputFile = defaultCatalogFile;
     print('Using the default DSO catalog file at ${inputFile.absolute}');
@@ -99,8 +132,8 @@ void main(List<String> args) async {
     return print('DSO catalog file can not be found');
   }
 
-  if (argResult['names'] != null) {
-    namesFile = File(argResult['names']);
+  if (names != null) {
+    namesFile = File(names);
   } else if (!force && defaultNamesFile.existsSync()) {
     namesFile = defaultNamesFile;
     print('Using the default DSO names catalog file at ${namesFile.absolute}');
@@ -128,8 +161,8 @@ void main(List<String> args) async {
 
   print('Loading DSO objects...');
 
-  if (argResult['output'] != null) {
-    outputFile = File(argResult['output']);
+  if (output != null) {
+    outputFile = File(output);
   } else {
     outputFile = zipped ? defaultZippedOutputFile : defaultOutputFile;
   }
@@ -156,13 +189,122 @@ void main(List<String> args) async {
 
   print('Generating catalog file...');
 
+  final imageDsoFile = File('$photoOutput/dso.jpg');
+
   try {
     final bytes = utf8.encode(encoder.convert(data));
     outputFile.writeAsBytesSync(zipped ? gzip.encode(bytes) : bytes);
     print('Generated catalog file at ${outputFile.absolute}');
+
+    if (photo) {
+      print('Generating photos...');
+
+      const v = [
+        // 'poss2ukstu_red',
+        'poss2ukstu_blue',
+        // 'poss2ukstu_ir',
+        // 'poss1_red',
+        // 'poss1_blue',
+        // 'quickv',
+        'phase2_gsc2',
+        // 'phase2_gsc1',
+      ];
+
+      // http://archive.stsci.edu/cgi-bin/dss_form
+      // http://archive.stsci.edu/cgi-bin/dss_search?v=phase2_gsc2&r=00+07+15.86&d=%2B27+42+29.0&e=J2000&h=10&w=10&f=gif&c=none&fov=NONE&v3=
+      final imageUrl = 'http://archive.stsci.edu/cgi-bin/dss_search';
+      final dssQueryBuilder = QueriesBuilder()
+        // ..add('v', v[0])
+        ..add('e', 'J2000')
+        ..add('f', 'gif')
+        ..add('c', 'none')
+        ..add('fov', 'NONE')
+        ..add('v3', null);
+
+      Directory(photoOutput).createSync();
+      final photoMetadataFile = File('$photoOutput/metadata.json');
+
+      final metadata = photoMetadataFile.existsSync()
+          ? json.decode(photoMetadataFile.readAsStringSync())
+          : <String, dynamic>{};
+      final metaDataEncoder = JsonEncoder.withIndent('  ');
+
+      for (final nebula in data) {
+        final id = nebula.id;
+        final imageName = '$id'.padLeft(5, '0');
+        final imageWebpFile = File('$photoOutput/$imageName.webp');
+        final imageJpgFile = File('$photoOutput/$imageName.jpg');
+        final imageFile = webp ? imageWebpFile : imageJpgFile;
+
+        if (!force && imageFile.existsSync() && imageFile.lengthSync() > 0) {
+          continue;
+        }
+
+        final raHms = nebula.ra.raToHms();
+        final decHms = nebula.dec.decToHms();
+
+        dssQueryBuilder.set('r', raHms);
+        dssQueryBuilder.set('d', decHms);
+        dssQueryBuilder.set('w', 60);
+        dssQueryBuilder.set('h', 60);
+
+        progressBar.prefix = 'Nebula $id: ';
+
+        for (var i = 0; i < v.length; i++) {
+          dssQueryBuilder.set('v', v[i]);
+          final request =
+              Request.get(imageUrl, queries: dssQueryBuilder.build());
+          final call = restio.newCall(request);
+          final response = await call.execute();
+          final bytes = await response.body.decompressed();
+
+          try {
+            final image = decodeGif(bytes);
+            final resizedImage =
+                copyResize(image, width: width, height: height);
+            final jpg = encodeJpg(resizedImage, quality: 100);
+
+            if (webp) {
+              imageDsoFile.writeAsBytesSync(jpg);
+
+              // cwebp -q 50 00001.jpg -o 00001.70.webp
+              await Process.start('cwebp', [
+                '-q',
+                '$quality',
+                '${imageDsoFile.path}',
+                '-o',
+                '${imageFile.path}'
+              ]);
+            } else {
+              imageFile.writeAsBytesSync(jpg);
+            }
+
+            metadata[imageName] = {
+              'height': image.height,
+              'size': bytes.length,
+              'url': request.uri.toUriString(),
+              'width': image.width,
+            };
+
+            photoMetadataFile
+                .writeAsStringSync(metaDataEncoder.convert(metadata));
+
+            break;
+          } catch (e) {
+            print('ERROR: Nebula ${nebula.id} $raHms $decHms');
+          } finally {
+            await response.close();
+          }
+        }
+      }
+    }
   } catch (e) {
     return print('Error: $e');
   } finally {
     await restio.close();
+
+    if (imageDsoFile.existsSync()) {
+      imageDsoFile.deleteSync();
+    }
   }
 }

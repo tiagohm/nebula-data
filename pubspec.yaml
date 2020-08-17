@@ -10,6 +10,7 @@ dependencies:
   equatable: ^1.2.0
   args: ^1.6.0
   restio: ^0.10.8
+  image: ^2.1.14
 
 dev_dependencies:
   test: ^1.15.0
