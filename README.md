@@ -14,7 +14,7 @@ A command-line utility for extract Stellarium DSO Catalog to JSON.
 2. Activate the package:
 
 ```
-pub global activate -sgit https://gitlab.com/tiagohm/nebula-data
+pub global activate -sgit https://github.com/tiagohm/nebula-data
 ```
 
 3. Run the script:
