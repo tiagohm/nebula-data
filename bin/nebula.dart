@@ -26,15 +26,17 @@ final defaultZippedOutputFile = File('catalog.json.gz');
 
 final progressBar = ProgressBar();
 
-final restio = Restio(onDownloadProgress: (res, length, total, end) {
-  final contentLength = res.headers.last('Content-Length')?.asInt ?? -1;
-  final progress = (total * 100 / contentLength).toStringAsFixed(1);
-  progressBar.update('Progress: $total/$contentLength ($progress%)');
+final restio = Restio(
+  onDownloadProgress: (res, length, total, end) {
+    final contentLength = res.headers.last('Content-Length')?.asInt ?? -1;
+    final progress = (total * 100 / contentLength).toStringAsFixed(1);
+    progressBar.update('Progress: $total/$contentLength ($progress%)');
 
-  if (end) {
-    progressBar.end();
-  }
-});
+    if (end) {
+      progressBar.end();
+    }
+  },
+);
 
 class ProgressBar {
   var _output = '';
@@ -73,7 +75,8 @@ void main(List<String> args) async {
     ..addFlag('minify', abbr: 'm')
     ..addFlag('zipped', abbr: 'z')
     ..addFlag('force', abbr: 'f')
-    ..addFlag('photo', abbr: 'p')
+    ..addFlag('photos', abbr: 'p')
+    ..addFlag('only-photos', negatable: false)
     ..addFlag('webp', negatable: false);
 
   final result = parser.parse(args);
@@ -86,7 +89,8 @@ Future<void> handleCatalog(ArgResults result) async {
   final minify = result['minify'] as bool;
   final zipped = result['zipped'] as bool;
   final force = result['force'] as bool;
-  final photo = result['photo'] as bool;
+  final photos = result['photos'] as bool;
+  final onlyPhotos = result['only-photos'] as bool;
   final input = result['input'] as String;
   final names = result['names'] as String;
   final output = result['output'] as String;
@@ -102,10 +106,14 @@ Future<void> handleCatalog(ArgResults result) async {
 
   if (input != null) {
     inputFile = File(input);
-  } else if (!force && !extended && defaultCatalogFile.existsSync()) {
+  } else if ((!force || onlyPhotos) &&
+      !extended &&
+      defaultCatalogFile.existsSync()) {
     inputFile = defaultCatalogFile;
     print('Using the default DSO catalog file at ${inputFile.absolute}');
-  } else if (!force && extended && defaultExtendedCatalogFile.existsSync()) {
+  } else if ((!force || onlyPhotos) &&
+      extended &&
+      defaultExtendedCatalogFile.existsSync()) {
     inputFile = defaultExtendedCatalogFile;
     print('Using the default DSO catalog file at ${inputFile.absolute}');
   } else {
@@ -134,7 +142,7 @@ Future<void> handleCatalog(ArgResults result) async {
 
   if (names != null) {
     namesFile = File(names);
-  } else if (!force && defaultNamesFile.existsSync()) {
+  } else if ((!force || onlyPhotos) && defaultNamesFile.existsSync()) {
     namesFile = defaultNamesFile;
     print('Using the default DSO names catalog file at ${namesFile.absolute}');
   } else {
@@ -187,16 +195,17 @@ Future<void> handleCatalog(ArgResults result) async {
       ))
       .fold<List<Nebula>>([], (a, b) => a..addAll(b));
 
-  print('Generating catalog file...');
-
   final imageDsoFile = File('$photoOutput/dso.jpg');
 
   try {
-    final bytes = utf8.encode(encoder.convert(data));
-    outputFile.writeAsBytesSync(zipped ? gzip.encode(bytes) : bytes);
-    print('Generated catalog file at ${outputFile.absolute}');
+    if (!onlyPhotos) {
+      print('Generating catalog file...');
+      final bytes = utf8.encode(encoder.convert(data));
+      outputFile.writeAsBytesSync(zipped ? gzip.encode(bytes) : bytes);
+      print('Generated catalog file at ${outputFile.absolute}');
+    }
 
-    if (photo) {
+    if (photos) {
       print('Generating photos...');
 
       const v = [
@@ -221,13 +230,15 @@ Future<void> handleCatalog(ArgResults result) async {
         ..add('fov', 'NONE')
         ..add('v3', null);
 
-      Directory(photoOutput).createSync();
+      Directory(photoOutput).createSync(recursive: true);
       final photoMetadataFile = File('$photoOutput/metadata.json');
 
       final metadata = photoMetadataFile.existsSync()
           ? json.decode(photoMetadataFile.readAsStringSync())
           : <String, dynamic>{};
       final metaDataEncoder = JsonEncoder.withIndent('  ');
+      var totalPhotoLength = 0;
+      var photoAmount = 0;
 
       for (final nebula in data) {
         final id = nebula.id;
@@ -262,13 +273,14 @@ Future<void> handleCatalog(ArgResults result) async {
             final image = decodeGif(bytes);
             final resizedImage =
                 copyResize(image, width: width, height: height);
-            final jpg = encodeJpg(resizedImage, quality: 100);
+            final jpgQuality = webp ? 100 : quality;
+            final jpg = encodeJpg(resizedImage, quality: jpgQuality);
 
             if (webp) {
               imageDsoFile.writeAsBytesSync(jpg);
 
               // cwebp -q 50 00001.jpg -o 00001.70.webp
-              await Process.start('cwebp', [
+              await Process.run('cwebp', [
                 '-q',
                 '$quality',
                 '${imageDsoFile.path}',
@@ -296,6 +308,11 @@ Future<void> handleCatalog(ArgResults result) async {
             await response.close();
           }
         }
+
+        photoAmount++;
+        totalPhotoLength += await imageFile.length();
+        print('Total photos length: $totalPhotoLength B,'
+            ' ${totalPhotoLength ~/ photoAmount} B/photo');
       }
     }
   } catch (e) {
