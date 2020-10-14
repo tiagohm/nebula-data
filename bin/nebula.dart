@@ -29,11 +29,14 @@ final progressBar = ProgressBar();
 final restio = Restio(
   onDownloadProgress: (res, length, total, end) {
     final contentLength = res.headers.last('Content-Length')?.asInt ?? -1;
-    final progress = (total * 100 / contentLength).toStringAsFixed(1);
-    progressBar.update('Progress: $total/$contentLength ($progress%)');
 
-    if (end) {
-      progressBar.end();
+    if (contentLength > 0) {
+      final progress = (total * 100 / contentLength).toStringAsFixed(1);
+      progressBar.update('Progress: $total/$contentLength ($progress%)');
+
+      if (end) {
+        progressBar.end();
+      }
     }
   },
 );
@@ -270,42 +273,51 @@ Future<void> handleCatalog(ArgResults result) async {
           final bytes = await response.body.decompressed();
 
           try {
-            final image = decodeGif(bytes);
-            final resizedImage =
-                copyResize(image, width: width, height: height);
-            final jpgQuality = webp ? 100 : quality;
-            final jpg = encodeJpg(resizedImage, quality: jpgQuality);
+            if (bytes != null &&
+                bytes.isNotEmpty &&
+                response.headers.first('content-type').value == 'image/gif') {
+              final image = decodeGif(bytes);
+              final resizedImage =
+                  copyResize(image, width: width, height: height);
+              final jpgQuality = webp ? 100 : quality;
+              final jpg = encodeJpg(resizedImage, quality: jpgQuality);
 
-            if (webp) {
-              imageDsoFile.writeAsBytesSync(jpg);
+              if (webp) {
+                imageDsoFile.writeAsBytesSync(jpg);
 
-              // cwebp -q 50 00001.jpg -o 00001.70.webp
-              await Process.run('cwebp', [
-                '-q',
-                '$quality',
-                '${imageDsoFile.path}',
-                '-o',
-                '${imageFile.path}'
-              ]);
-            } else {
-              imageFile.writeAsBytesSync(jpg);
+                // cwebp -q 50 00001.jpg -o 00001.70.webp
+                await Process.run('cwebp', [
+                  '-q',
+                  '$quality',
+                  '${imageDsoFile.path}',
+                  '-o',
+                  '${imageFile.path}'
+                ]);
+              } else {
+                imageFile.writeAsBytesSync(jpg);
+              }
+
+              metadata[imageName] = {
+                'height': image.height,
+                'size': bytes.length,
+                'url': request.uri.toUriString(),
+                'width': image.width,
+              };
+
+              photoMetadataFile
+                  .writeAsStringSync(metaDataEncoder.convert(metadata));
+
+              break;
             }
-
-            metadata[imageName] = {
-              'height': image.height,
-              'size': bytes.length,
-              'url': request.uri.toUriString(),
-              'width': image.width,
-            };
-
-            photoMetadataFile
-                .writeAsStringSync(metaDataEncoder.convert(metadata));
-
-            break;
           } catch (e) {
-            print('ERROR: Nebula ${nebula.id} $raHms $decHms');
+            final message = '$e';
+            print('ERROR: Nebula ${nebula.id} $raHms $decHms - $message');
           } finally {
-            await response.close();
+            try {
+              await response.close();
+            } catch (e) {
+              // nada.
+            }
           }
         }
 
