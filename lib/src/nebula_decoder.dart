@@ -155,7 +155,7 @@ class NebulaDecoder extends Converter<List<int>, List<Nebula>> {
   }
 
   static int _readInt(RawReader reader) {
-    return reader.readUint32();
+    return reader.readInt32();
   }
 
   static double _readFloat(RawReader reader) {

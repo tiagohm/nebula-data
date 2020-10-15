@@ -145,7 +145,7 @@ class Nebula extends Equatable {
     if (minorAxisSize != 0) {
       json['minorAxisSize'] = minorAxisSize.dp(8);
     }
-    if (orientationAngle != 0) {
+    if (orientationAngle >= 0 && orientationAngle <= 360) {
       json['orientationAngle'] = orientationAngle;
     }
     if (redshift != 99.0) {
