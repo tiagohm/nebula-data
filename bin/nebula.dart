@@ -263,14 +263,45 @@ Future<void> handleCatalog(ArgResults result) async {
         dssQueryBuilder.set('h', 60);
 
         progressBar.prefix = 'Nebula $id: ';
+        var failed = false;
 
         for (var i = 0; i < v.length; i++) {
           dssQueryBuilder.set('v', v[i]);
           final request =
               Request.get(imageUrl, queries: dssQueryBuilder.build());
           final call = restio.newCall(request);
-          final response = await call.execute();
-          final bytes = await response.body.decompressed();
+
+          Response response;
+          List<int> bytes;
+          var attempts = 0;
+
+          for (attempts; attempts < 10; attempts++) {
+            try {
+              response = await call.execute();
+            } catch (e) {
+              print('Error: $e attempt #$attempts');
+              continue;
+            }
+
+            try {
+              bytes = await response.body.decompressed();
+              break;
+            } catch (e) {
+              print('Error: $e attempt #$attempts');
+
+              try {
+                await response.close();
+              } catch (e) {
+                // nada.
+              }
+            }
+          }
+
+          if (attempts == 10) {
+            failed = true;
+            print('Nebula $i failed!');
+            break;
+          }
 
           try {
             if (bytes != null &&
@@ -321,10 +352,12 @@ Future<void> handleCatalog(ArgResults result) async {
           }
         }
 
-        photoAmount++;
-        totalPhotoLength += await imageFile.length();
-        print('Total photos length: $totalPhotoLength B,'
-            ' ${totalPhotoLength ~/ photoAmount} B/photo');
+        if (!failed) {
+          photoAmount++;
+          totalPhotoLength += await imageFile.length();
+          print('Total photos length: $totalPhotoLength B,'
+              ' ${totalPhotoLength ~/ photoAmount} B/photo');
+        }
       }
     }
   } catch (e) {
