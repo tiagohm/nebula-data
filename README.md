@@ -37,6 +37,7 @@ nebula -m -i <path> -n <path> -o <path>
 * If `-q` or `--quality` option is present, sets the photo quality (0-100) (the default is 70);
 * If `-w` or `--width` option is present, sets the photo width (the default is 512);
 * If `-h` or `--height` option is present, sets the photo height (the default is 512);
+* If `-r` or `--reverse` option is present, the photos will be generated from last catalog entry;
 
 Recomendation for photos generation:
 

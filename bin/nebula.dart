@@ -80,7 +80,8 @@ void main(List<String> args) async {
     ..addFlag('force', abbr: 'f')
     ..addFlag('photos', abbr: 'p')
     ..addFlag('only-photos', negatable: false)
-    ..addFlag('webp', negatable: false);
+    ..addFlag('webp', negatable: false)
+    ..addFlag('reverse', abbr: 'r');
 
   final result = parser.parse(args);
 
@@ -92,8 +93,8 @@ Future<void> handleCatalog(ArgResults result) async {
   final minify = result['minify'] as bool;
   final zipped = result['zipped'] as bool;
   final force = result['force'] as bool;
-  final photos = result['photos'] as bool;
   final onlyPhotos = result['only-photos'] as bool;
+  final photos = result['photos'] as bool || onlyPhotos;
   final input = result['input'] as String;
   final names = result['names'] as String;
   final output = result['output'] as String;
@@ -102,6 +103,7 @@ Future<void> handleCatalog(ArgResults result) async {
   final width = int.tryParse(result['width']) ?? defaultWidth;
   final height = int.tryParse(result['height']) ?? defaultHeight;
   final webp = result['webp'] as bool;
+  final reverse = result['reverse'] as bool;
 
   File inputFile;
   File namesFile;
@@ -243,7 +245,7 @@ Future<void> handleCatalog(ArgResults result) async {
       var totalPhotoLength = 0;
       var photoAmount = 0;
 
-      for (final nebula in data) {
+      for (final nebula in reverse ? data.reversed : data) {
         final id = nebula.id;
         final imageName = '$id'.padLeft(5, '0');
         final imageWebpFile = File('$photoOutput/$imageName.webp');
