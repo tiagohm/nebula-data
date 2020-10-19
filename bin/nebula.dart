@@ -236,12 +236,7 @@ Future<void> handleCatalog(ArgResults result) async {
         ..add('v3', null);
 
       Directory(photoOutput).createSync(recursive: true);
-      final photoMetadataFile = File('$photoOutput/metadata.json');
 
-      final metadata = photoMetadataFile.existsSync()
-          ? json.decode(photoMetadataFile.readAsStringSync())
-          : <String, dynamic>{};
-      final metaDataEncoder = JsonEncoder.withIndent('  ');
       var totalPhotoLength = 0;
       var photoAmount = 0;
 
@@ -329,16 +324,6 @@ Future<void> handleCatalog(ArgResults result) async {
               } else {
                 imageFile.writeAsBytesSync(jpg);
               }
-
-              metadata[imageName] = {
-                'height': image.height,
-                'size': bytes.length,
-                'url': request.uri.toUriString(),
-                'width': image.width,
-              };
-
-              photoMetadataFile
-                  .writeAsStringSync(metaDataEncoder.convert(metadata));
 
               break;
             }
