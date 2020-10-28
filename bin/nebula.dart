@@ -24,6 +24,7 @@ const versions = [
 ];
 
 const reportVersions = [
+  'poss1_blue',
   'phase2_gsc1',
 ];
 
