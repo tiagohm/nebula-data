@@ -253,8 +253,10 @@ Future<void> handleCatalog(ArgResults result) async {
 
       for (final nebula in reverse ? data.reversed : data) {
         final id = nebula.id;
+        final dontGenerateReport =
+            force ? !report.containsKey('$id') : report['$id'] != true;
 
-        if (isReport && report['$id'] != true) {
+        if (isReport && dontGenerateReport) {
           continue;
         }
 
