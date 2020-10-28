@@ -1,5 +1,5 @@
 name: nebula
-description: A command-line utility to extract Stellarium DSO Catalog into JSON.
+description: A command-line utility to handle the Stellarium DSO Catalog.
 version: 0.1.0
 
 environment:

@@ -123,6 +123,66 @@ class Nebula extends Equatable {
     this.dunlop = false,
   });
 
+  factory Nebula.fromJson(json) {
+    final names = json['names'];
+
+    return Nebula(
+      id: json['id'],
+      m: json['m'],
+      ngc: json['ngc'],
+      ic: json['ic'],
+      c: json['c'],
+      b: json['b'],
+      sh2: json['sh2'],
+      vdb: json['vdb'],
+      rcw: json['rcw'],
+      ldn: json['ldn'],
+      lbn: json['lbn'],
+      cr: json['cr'],
+      mel: json['mel'],
+      pgc: json['pgc'],
+      ugc: json['ugc'],
+      arp: json['arp'],
+      vv: json['vv'],
+      dwb: json['dwb'],
+      tr: json['tr'],
+      st: json['st'],
+      ru: json['ru'],
+      vdbha: json['vdbha'],
+      ced: json['ced'],
+      pk: json['pk'],
+      png: json['png'],
+      snrg: json['snrg'],
+      aco: json['aco'],
+      hcg: json['hcg'],
+      eso: json['eso'],
+      vdbh: json['vdbh'],
+      mType: json['mType'],
+      bMag: json['bMag'],
+      vMag: json['vMag'],
+      majorAxisSize: json['majorAxisSize'],
+      minorAxisSize: json['minorAxisSize'],
+      orientationAngle: json['orientationAngle'],
+      distance: json['distance'],
+      distanceErr: json['distanceErr'],
+      redshift: json['redshift'],
+      redshiftErr: json['redshiftErr'],
+      parallax: json['parallax'],
+      parallaxErr: json['parallaxErr'],
+      ra: json['ra'],
+      dec: json['dec'],
+      type: json['type,'],
+      names: names == null
+          ? const []
+          : (names as List).map((e) => '$e').toList(growable: false),
+      surfaceBrightness: json['surfaceBrightness'],
+      constellation: json['constellation,'],
+      h400: json['h400'],
+      bennett: json['bennett'],
+      dunlop: json['dunlop'],
+    );
+  }
+
   Map<String, dynamic> toJson() {
     final json = SplayTreeMap<String, dynamic>();
 
