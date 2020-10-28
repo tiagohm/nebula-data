@@ -1,8 +1,7 @@
 import 'package:args/args.dart';
-
-import 'common.dart';
-import 'data.dart';
-import 'photo.dart';
+import 'package:nebula/src/tool/common.dart';
+import 'package:nebula/src/tool/data.dart';
+import 'package:nebula/src/tool/photo.dart';
 
 void main(List<String> args) async {
   final dataParser = ArgParser()
