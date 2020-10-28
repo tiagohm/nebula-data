@@ -12,6 +12,21 @@ const defaultQuality = 70;
 const defaultWidth = 512;
 const defaultHeight = 512;
 
+const versions = [
+  // 'poss2ukstu_red',
+  'poss2ukstu_blue',
+  // 'poss2ukstu_ir',
+  // 'poss1_red',
+  // 'poss1_blue',
+  // 'quickv',
+  'phase2_gsc2',
+  // 'phase2_gsc1',
+];
+
+const reportVersions = [
+  'phase2_gsc1',
+];
+
 final catalogRequest = Request.get(
     'https://raw.githubusercontent.com/Stellarium/stellarium/master/nebulae/default/catalog.dat');
 final extendedCatalogRequest = Request.get(
@@ -23,6 +38,7 @@ final defaultExtendedCatalogFile = File('catalog.extended.dat');
 final defaultNamesFile = File('names.dat');
 final defaultOutputFile = File('catalog.json');
 final defaultZippedOutputFile = File('catalog.json.gz');
+final defaultReportFile = File('report.json');
 
 final progressBar = ProgressBar();
 
@@ -80,6 +96,7 @@ void main(List<String> args) async {
     ..addFlag('force', abbr: 'f')
     ..addFlag('photos', abbr: 'p')
     ..addFlag('only-photos', negatable: false)
+    ..addFlag('report', negatable: false)
     ..addFlag('webp', negatable: false)
     ..addFlag('reverse', abbr: 'r');
 
@@ -202,6 +219,11 @@ Future<void> handleCatalog(ArgResults result) async {
 
   final imageDsoFile = File('$photoOutput/dso.jpg');
 
+  final isReport = result['report'] as bool;
+  final Map<String, dynamic> report =
+      isReport ? json.decode(defaultReportFile.readAsStringSync()) : const {};
+  final v = isReport ? reportVersions : versions;
+
   try {
     if (!onlyPhotos) {
       print('Generating catalog file...');
@@ -212,17 +234,6 @@ Future<void> handleCatalog(ArgResults result) async {
 
     if (photos) {
       print('Generating photos...');
-
-      const v = [
-        // 'poss2ukstu_red',
-        'poss2ukstu_blue',
-        // 'poss2ukstu_ir',
-        // 'poss1_red',
-        // 'poss1_blue',
-        // 'quickv',
-        'phase2_gsc2',
-        // 'phase2_gsc1',
-      ];
 
       // http://archive.stsci.edu/cgi-bin/dss_form
       // http://archive.stsci.edu/cgi-bin/dss_search?v=phase2_gsc2&r=00+07+15.86&d=%2B27+42+29.0&e=J2000&h=10&w=10&f=gif&c=none&fov=NONE&v3=
@@ -242,12 +253,20 @@ Future<void> handleCatalog(ArgResults result) async {
 
       for (final nebula in reverse ? data.reversed : data) {
         final id = nebula.id;
+
+        if (isReport && report['$id'] != true) {
+          continue;
+        }
+
         final imageName = '$id'.padLeft(5, '0');
         final imageWebpFile = File('$photoOutput/$imageName.webp');
         final imageJpgFile = File('$photoOutput/$imageName.jpg');
         final imageFile = webp ? imageWebpFile : imageJpgFile;
 
-        if (!force && imageFile.existsSync() && imageFile.lengthSync() > 0) {
+        if (!isReport &&
+            !force &&
+            imageFile.existsSync() &&
+            imageFile.lengthSync() > 0) {
           continue;
         }
 
@@ -313,7 +332,7 @@ Future<void> handleCatalog(ArgResults result) async {
               if (webp) {
                 imageDsoFile.writeAsBytesSync(jpg);
 
-                // cwebp -q 50 00001.jpg -o 00001.70.webp
+                // cwebp -q 50 00001.jpg -o 00001.webp
                 await Process.run('cwebp', [
                   '-q',
                   '$quality',
@@ -323,6 +342,10 @@ Future<void> handleCatalog(ArgResults result) async {
                 ]);
               } else {
                 imageFile.writeAsBytesSync(jpg);
+              }
+
+              if (isReport) {
+                report['$id'] = false;
               }
 
               break;
@@ -355,5 +378,7 @@ Future<void> handleCatalog(ArgResults result) async {
     if (imageDsoFile.existsSync()) {
       imageDsoFile.deleteSync();
     }
+
+    defaultReportFile.writeAsStringSync(json.encode(report));
   }
 }
